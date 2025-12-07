@@ -1,0 +1,77 @@
+{
+  "last_updated": "2025-11-25T10:15:28.219Z",
+  "settings": {
+    "spawn_rate": 100,
+    "bid_rate": 150,
+    "owner_id": 6245574035
+  },
+  "statistics": {
+    "total_users": "47",
+    "total_waifus": "120",
+    "total_harem_entries": "112",
+    "total_groups": "5"
+  },
+  "roles": {
+    "developers": [
+      {
+        "user_id": "8195158525",
+        "username": "SHUBHXM_FR",
+        "first_name": "𝙻𝚄𝙵𝙵𝚈 🜲ᴀ×ᴡ 𓆩🖤𓆪"
+      },
+      {
+        "user_id": "6822713015",
+        "username": "iamnobita2967",
+        "first_name": "Nobita🜲ᴀ×ᴡ 𓆩🖤𓆪"
+      },
+      {
+        "user_id": "6245574035",
+        "username": "THEGAMERADEPT",
+        "first_name": "𝗧𝗛𝗘𝗚𝗔𝗠𝗘𝗥𝗔𝗗𝗘𝗣𝗧 🜲ᴀ×ᴡ 𓆩🖤𓆪"
+      }
+    ],
+    "sudos": [
+      {
+        "user_id": "8215101040",
+        "username": "NOBITAxGAMER",
+        "first_name": "𝗡𝗢𝗕𝗜𝗧𝗔 𝗛𝗘𝗥𝗘 💥"
+      },
+      {
+        "user_id": "6822713015",
+        "username": "iamnobita2967",
+        "first_name": "Nobita🜲ᴀ×ᴡ 𓆩🖤𓆪"
+      },
+      {
+        "user_id": "5834136812",
+        "username": null,
+        "first_name": "❛ . 𝐒 𝐄 𝐈 𝐒 𝐇 𝐈 𝐑 𝐎 𝐍 𝐀 𝐆 𝐈 ꯭™ | 𓂃• ‹𝟹"
+      }
+    ],
+    "uploaders": [
+      {
+        "user_id": "6374911003",
+        "username": "SIR_GHOST_RILEY",
+        "first_name": "SIMON_RILEY 🜲ᴀ×ᴡ 𓆩🖤𓆪"
+      },
+      {
+        "user_id": "8215101040",
+        "username": "NOBITAxGAMER",
+        "first_name": "𝗡𝗢𝗕𝗜𝗧𝗔 𝗛𝗘𝗥𝗘 💥"
+      },
+      {
+        "user_id": "7215212687",
+        "username": "anuragmahant",
+        "first_name": "Anurag"
+      },
+      {
+        "user_id": "6245574035",
+        "username": "THEGAMERADEPT",
+        "first_name": "𝗧𝗛𝗘𝗚𝗔𝗠𝗘𝗥𝗔𝗗𝗘𝗣𝗧 🜲ᴀ×ᴡ 𓆩🖤𓆪"
+      },
+      {
+        "user_id": "6353553958",
+        "username": "DemonXploit",
+        "first_name": "Makoto"
+      }
+    ]
+  }
+}
