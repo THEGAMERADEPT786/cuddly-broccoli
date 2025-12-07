@@ -1,0 +1,19 @@
+{
+  "name": "waifu-collection-bot",
+  "version": "1.0.0",
+  "description": "Telegram Waifu Collection Bot - Anime character gacha game",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "node bot.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "node-telegram-bot-api": "^0.66.0",
+    "pg": "^8.16.3"
+  }
+}
