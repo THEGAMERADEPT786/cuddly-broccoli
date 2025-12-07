@@ -1538,12 +1538,12 @@ bot.onText(/\/adev(?:\s+(.+))?/, async (msg, match) => {
                 targetUsername = null;
             }
         } else {
-            return sendReply(msg.chat.id, msg.message_id, '❌ Invalid format! Use:\n• /adev (reply to user)\n• /adev @username\n• /adev <user_id>');
+            return sendReply(msg.chat.id, msg.message_id, '❌ Invalid format! Use:\n• /adev (reply to user)\n• /adev @username\n• /adev [user_id]');
         }
     }
 
     if (!targetId) {
-        return sendReply(msg.chat.id, msg.message_id, '❌ Reply to a user or use: /adev @username or /adev <user_id>');
+        return sendReply(msg.chat.id, msg.message_id, '❌ Reply to a user or use: /adev @username or /adev [user_id]');
     }
 
     // First ensure user exists in database
@@ -1593,7 +1593,7 @@ bot.onText(/\/rdev(?:\s+(.+))?/, async (msg, match) => {
     }
 
     if (!targetId) {
-        return sendReply(msg.chat.id, msg.message_id, '❌ Reply to a user or use: /rdev @username or /rdev <user_id>');
+        return sendReply(msg.chat.id, msg.message_id, '❌ Reply to a user or use: /rdev @username or /rdev [user_id]');
     }
 
     const result = await pool.query("DELETE FROM roles WHERE user_id = $1 AND role_type = 'dev' RETURNING *", [targetId]);
@@ -1908,7 +1908,7 @@ bot.onText(/\/give_waifu\s+(.+)/, async (msg, match) => {
     const target = await getTargetUser(msg, targetArgs);
 
     if (!target.targetId) {
-        return sendReply(msg.chat.id, msg.message_id, '❌ Reply to a user or use: /give_waifu <waifu_id/name> @username or /give_waifu <waifu_id/name> <user_id>');
+        return sendReply(msg.chat.id, msg.message_id, '❌ Reply to a user or use: /give_waifu [waifu_id/name] @username or /give_waifu [waifu_id/name] [user_id]');
     }
 
     let waifuCheck;
@@ -1963,7 +1963,7 @@ bot.onText(/\/give_cash\s+(.+)/, async (msg, match) => {
     const target = await getTargetUser(msg, args.slice(1));
 
     if (!target.targetId) {
-        return sendReply(msg.chat.id, msg.message_id, '❌ Reply to a user or use: /give_cash <amount> @username or /give_cash <amount> <user_id>');
+        return sendReply(msg.chat.id, msg.message_id, '❌ Reply to a user or use: /give_cash [amount] @username or /give_cash [amount] [user_id]');
     }
 
     let targetUsername = null;
