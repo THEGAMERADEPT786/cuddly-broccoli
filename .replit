@@ -31,6 +31,15 @@ waitForPort = 3000
 [workflows.workflow.metadata]
 outputType = "console"
 
+[[workflows.workflow]]
+name = "Guess Bot"
+author = 50927882
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node guess_bot.js"
+
 [[ports]]
 localPort = 3000
 externalPort = 3000

@@ -2,15 +2,18 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const { Pool } = require('pg');
 
-const GUESS_BOT_TOKEN = process.env.GUESS_BOT_TOKEN;
+const GUESS_BOT_TOKEN = process.env.GUESS_BOT_TOKEN || process.env.GUESS_TOKEN;
 const OFFICIAL_GROUP = '-1002503593313';
 const OFFICIAL_GROUP_LINK = 'https://t.me/AQUA_REALM';
 const GUESS_REWARD = 100;
 
 if (!GUESS_BOT_TOKEN) {
-    console.error('Error: GUESS_BOT_TOKEN not found in environment variables');
-    console.error('Please add GUESS_BOT_TOKEN secret in Replit');
-    process.exit(1);
+    console.error('⚠️ GUESS_BOT_TOKEN not found - Guess bot will not start');
+    console.error('Add GUESS_BOT_TOKEN in Replit Secrets to enable guess game');
+    console.log('Main bot will continue running...');
+    // Don't exit - let main bot continue
+    module.exports = { guessBot: null };
+    return;
 }
 
 const guessBot = new TelegramBot(GUESS_BOT_TOKEN, { polling: true });
