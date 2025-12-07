@@ -37,13 +37,18 @@ guessBot.onText(/\/start/, async (msg) => {
 
 // Guess command - only works in official group
 guessBot.onText(/\/lguess/, async (msg) => {
-    const chatId = msg.chat.id.toString();
+    const chatId = msg.chat.id;
     const userId = msg.from.id;
 
     console.log(`[DEBUG] /lguess command received from chat: ${chatId}, official: ${OFFICIAL_GROUP}`);
 
-    // Check if NOT in official group - only show join message in other groups
-    if (chatId !== OFFICIAL_GROUP && msg.chat.type !== 'private') {
+    // Ignore command in private chats
+    if (msg.chat.type === 'private') {
+        return;
+    }
+
+    // Check if NOT in official group - show join message
+    if (chatId.toString() !== OFFICIAL_GROUP) {
         const keyboard = {
             inline_keyboard: [
                 [{ text: '𝗝𝗢𝗜𝗡 𝗔𝗤𝗨𝗔 𝗥𝗘𝗔𝗟𝗠 𝗧𝗢 𝗣𝗟𝗔𝗬!', url: OFFICIAL_GROUP_LINK }]
@@ -54,11 +59,6 @@ guessBot.onText(/\/lguess/, async (msg) => {
             '❌ This command only works in AQUA REALM!',
             { reply_markup: keyboard, reply_to_message_id: msg.message_id }
         );
-    }
-    
-    // Ignore command in private chats
-    if (msg.chat.type === 'private') {
-        return;
     }
 
     try {
@@ -84,7 +84,7 @@ guessBot.onText(/\/lguess/, async (msg) => {
         });
 
         // Store active guess
-        activeGuesses.set(chatId, {
+        activeGuesses.set(chatId.toString(), {
             waifuId: waifu.waifu_id,
             correctName: waifu.name.toLowerCase(),
             startTime: Date.now()
@@ -94,8 +94,8 @@ guessBot.onText(/\/lguess/, async (msg) => {
 
         // Auto-delete guess after 2 minutes
         setTimeout(() => {
-            if (activeGuesses.has(chatId)) {
-                activeGuesses.delete(chatId);
+            if (activeGuesses.has(chatId.toString())) {
+                activeGuesses.delete(chatId.toString());
                 console.log(`[DEBUG] Auto-deleted guess for chat ${chatId}`);
             }
         }, 120000);
@@ -110,19 +110,19 @@ guessBot.onText(/\/lguess/, async (msg) => {
 
 // Answer guess command
 guessBot.onText(/\/lg\s+(.+)/, async (msg, match) => {
-    const chatId = msg.chat.id.toString();
+    const chatId = msg.chat.id;
     const userId = msg.from.id;
     const guess = match[1].trim().toLowerCase();
 
     console.log(`[DEBUG] /lg command received: "${guess}" from chat ${chatId}`);
 
     // Check if in official group
-    if (chatId !== OFFICIAL_GROUP) {
+    if (chatId.toString() !== OFFICIAL_GROUP) {
         return;
     }
 
     // Check if there's an active guess
-    const activeGuess = activeGuesses.get(chatId);
+    const activeGuess = activeGuesses.get(chatId.toString());
     if (!activeGuess) {
         console.log(`[DEBUG] No active guess for chat ${chatId}`);
         return guessBot.sendMessage(chatId, '❌ No active guess! Use /lguess first.', {
@@ -161,7 +161,7 @@ guessBot.onText(/\/lg\s+(.+)/, async (msg, match) => {
                 console.log(`[DEBUG] Added 100 crimson to user ${userId}`);
             }
 
-            activeGuesses.delete(chatId);
+            activeGuesses.delete(chatId.toString());
 
             return guessBot.sendMessage(chatId, 
                 `🎉 𝗖𝗢𝗥𝗥𝗘𝗖𝗧!\n\n${msg.from.first_name} guessed it right!\n\n+100 🩸 ᴄʀɪᴍsᴏɴ`,
