@@ -51,7 +51,7 @@ guessBot.onText(/\/lguess/, async (msg) => {
     }
 
     // Check if NOT in official group - show join message
-    if (chatId.toString() !== OFFICIAL_GROUP) {
+    if (String(chatId) !== String(OFFICIAL_GROUP)) {
         const keyboard = {
             inline_keyboard: [
                 [{ text: '𝗝𝗢𝗜𝗡 𝗔𝗤𝗨𝗔 𝗥𝗘𝗔𝗟𝗠 𝗧𝗢 𝗣𝗟𝗔𝗬!', url: OFFICIAL_GROUP_LINK }]
@@ -87,7 +87,7 @@ guessBot.onText(/\/lguess/, async (msg) => {
         });
 
         // Store active guess
-        activeGuesses.set(chatId.toString(), {
+        activeGuesses.set(String(chatId), {
             waifuId: waifu.waifu_id,
             correctName: waifu.name.toLowerCase(),
             startTime: Date.now()
@@ -97,8 +97,8 @@ guessBot.onText(/\/lguess/, async (msg) => {
 
         // Auto-delete guess after 2 minutes
         setTimeout(() => {
-            if (activeGuesses.has(chatId.toString())) {
-                activeGuesses.delete(chatId.toString());
+            if (activeGuesses.has(String(chatId))) {
+                activeGuesses.delete(String(chatId));
                 console.log(`[DEBUG] Auto-deleted guess for chat ${chatId}`);
             }
         }, 120000);
@@ -120,12 +120,12 @@ guessBot.onText(/\/lg\s+(.+)/, async (msg, match) => {
     console.log(`[DEBUG] /lg command received: "${guess}" from chat ${chatId}`);
 
     // Check if in official group
-    if (chatId.toString() !== OFFICIAL_GROUP) {
+    if (String(chatId) !== String(OFFICIAL_GROUP)) {
         return;
     }
 
     // Check if there's an active guess
-    const activeGuess = activeGuesses.get(chatId.toString());
+    const activeGuess = activeGuesses.get(String(chatId));
     if (!activeGuess) {
         console.log(`[DEBUG] No active guess for chat ${chatId}`);
         return guessBot.sendMessage(chatId, '❌ No active guess! Use /lguess first.', {
@@ -164,7 +164,7 @@ guessBot.onText(/\/lg\s+(.+)/, async (msg, match) => {
                 console.log(`[DEBUG] Added 100 crimson to user ${userId}`);
             }
 
-            activeGuesses.delete(chatId.toString());
+            activeGuesses.delete(String(chatId));
 
             return guessBot.sendMessage(chatId, 
                 `🎉 𝗖𝗢𝗥𝗥𝗘𝗖𝗧!\n\n${msg.from.first_name} guessed it right!\n\n+100 🩸 ᴄʀɪᴍsᴏɴ`,

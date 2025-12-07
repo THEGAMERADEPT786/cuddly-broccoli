@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const { Pool } = require('pg');
 const fs = require('fs').promises;
@@ -13,19 +12,19 @@ async function restoreAllData() {
         // Check all possible data files in attached_assets
         const assetsDir = './attached_assets';
         const files = await fs.readdir(assetsDir);
-        
+
         console.log('📁 Available files in attached_assets:');
         files.forEach(f => console.log(`   - ${f}`));
         console.log('\n');
 
-        // Try to find the most complete backup
-        let usersFile = './attached_assets/users_data_1765083826714.json';
-        let waifusFile = './attached_assets/waifus_data_1765083826818.json';
-        let botFile = './attached_assets/bot_data_1765083826844.json';
+        // Check if files exist - USE LATEST UPLOADED FILES
+        let usersFile = './attached_assets/users_data_1765087644875.json';
+        let waifusFile = './attached_assets/waifus_data_1765087644903.json';
+        let botFile = './attached_assets/bot_data_1765087644936.json';
 
         // Check if files exist
         let usersData, waifusData, botData;
-        
+
         try {
             usersData = JSON.parse(await fs.readFile(usersFile, 'utf-8'));
             console.log(`✅ Users data loaded: ${usersData.total_users} users`);
@@ -157,7 +156,7 @@ async function restoreAllData() {
         console.log(`   🎴 Waifus: ${finalStats.waifus.rows[0].count}`);
         console.log(`   💕 Harem Entries: ${finalStats.harem.rows[0].count}`);
         console.log('\n');
-        
+
         if (parseInt(finalStats.waifus.rows[0].count) === 0) {
             console.log('⚠️  WARNING: No waifus in database!');
             console.log('📝 Next steps:');
@@ -165,7 +164,7 @@ async function restoreAllData() {
             console.log('   2. Or start uploading new waifus using /upload command');
             console.log('\n');
         }
-        
+
         process.exit(0);
     } catch (error) {
         console.error('❌ Error restoring data:', error);
