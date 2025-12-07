@@ -782,7 +782,7 @@ bot.on('callback_query', async (query) => {
             });
             const keyboard = {
                 inline_keyboard: [
-                    [{ text: '🩷 ᴡᴀɪғᴜs', callback_data: 'top_waifus' }],
+                    [{ text: '🩷 ᴡᴀɪғᴜs', callback_data: 'top_waifus' }, { text: '💎 ɢᴇᴍs', callback_data: 'top_gems' }],
                     [{ text: '« CLOSE', callback_data: 'delete_message' }]
                 ]
             };
@@ -803,7 +803,26 @@ bot.on('callback_query', async (query) => {
             });
             const keyboard = {
                 inline_keyboard: [
-                    [{ text: '💸 ᴄᴀꜱʜ', callback_data: 'top_cash' }],
+                    [{ text: '💸 ᴄᴀꜱʜ', callback_data: 'top_cash' }, { text: '💎 ɢᴇᴍs', callback_data: 'top_gems' }],
+                    [{ text: '« CLOSE', callback_data: 'delete_message' }]
+                ]
+            };
+            await bot.editMessageText(message, {
+                chat_id: chatId,
+                message_id: messageId,
+                parse_mode: 'HTML',
+                reply_markup: keyboard
+            });
+        } else if (data === 'top_gems') {
+            const topGems = await pool.query('SELECT user_id, username, first_name, gems FROM users ORDER BY gems DESC LIMIT 10');
+            let message = '💎 <b>Top Gem Holders</b>\n\n';
+            topGems.rows.forEach((u, i) => {
+                const name = u.username ? `@${u.username}` : u.first_name;
+                message += `${i + 1}. ${name} - <b>${u.gems || 0} 💎 ɢᴇᴍs</b>\n`;
+            });
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: '💸 ᴄᴀꜱʜ', callback_data: 'top_cash' }, { text: '🩷 ᴡᴀɪғᴜs', callback_data: 'top_waifus' }],
                     [{ text: '« CLOSE', callback_data: 'delete_message' }]
                 ]
             };
@@ -1030,7 +1049,8 @@ bot.onText(/\/dart(?:\s+(\d+))?/, async (msg, match) => {
 bot.onText(/\/top/, async (msg) => {
     const keyboard = {
         inline_keyboard: [
-            [{ text: '💸 ᴄᴀꜱʜ', callback_data: 'top_cash' }, { text: '🩷 ᴡᴀɪғᴜs', callback_data: 'top_waifus' }]
+            [{ text: '💸 ᴄᴀꜱʜ', callback_data: 'top_cash' }, { text: '🩷 ᴡᴀɪғᴜs', callback_data: 'top_waifus' }],
+            [{ text: '💎 ɢᴇᴍs', callback_data: 'top_gems' }]
         ]
     };
 
@@ -4261,8 +4281,8 @@ bot.onText(/\/give_waifu(?:\s+(\d+))?/, async (msg, match) => {
 });
 
 // ==================== REWARD CUSTOM COMMANDS (Owner Only) ====================
-// Format: /addreward /trigger Give <amount> gems
-// or: /addreward /trigger Give waifu id - <waifu_id>
+// Format: /addreward /trigger Give <amount> gems (1 hour)
+// or: /addreward /trigger Give waifu id - <waifu_id> (10 seconds)
 bot.onText(/\/addreward\s+\/(\w+)\s+Give\s+(.+)/i, async (msg, match) => {
     const userId = msg.from.id;
 
@@ -4278,11 +4298,29 @@ bot.onText(/\/addreward\s+\/(\w+)\s+Give\s+(.+)/i, async (msg, match) => {
         return sendReply(msg.chat.id, msg.message_id, '❌ Cannot override system commands!');
     }
 
+    // Parse time duration (1 second, 10 minutes, 1 hour, 1 day, 1 year)
+    const timeMatch = rewardText.match(/\((\d+)\s*(second|seconds|minute|minutes|hour|hours|day|days|year|years)\)/i);
+    let expiryTime = null;
+    
+    if (timeMatch) {
+        const amount = parseInt(timeMatch[1]);
+        const unit = timeMatch[2].toLowerCase();
+        
+        let seconds = 0;
+        if (unit.startsWith('second')) seconds = amount;
+        else if (unit.startsWith('minute')) seconds = amount * 60;
+        else if (unit.startsWith('hour')) seconds = amount * 3600;
+        else if (unit.startsWith('day')) seconds = amount * 86400;
+        else if (unit.startsWith('year')) seconds = amount * 31536000;
+        
+        expiryTime = new Date(Date.now() + seconds * 1000);
+    }
+
     try {
         if (rewardText.toLowerCase().includes('waifu id')) {
             const waifuMatch = rewardText.match(/waifu\s*id\s*[-:]?\s*(\d+)/i);
             if (!waifuMatch) {
-                return sendReply(msg.chat.id, msg.message_id, '❌ Invalid format!\n\nUsage: /addreward /trigger Give waifu id - 123');
+                return sendReply(msg.chat.id, msg.message_id, '❌ Invalid format!\n\nUsage: /addreward /trigger Give waifu id - 123 (1 hour)');
             }
             const waifuId = parseInt(waifuMatch[1]);
             
@@ -4292,22 +4330,26 @@ bot.onText(/\/addreward\s+\/(\w+)\s+Give\s+(.+)/i, async (msg, match) => {
             }
             
             await pool.query(
-                'INSERT INTO custom_commands (command_trigger, reward_type, waifu_id, created_by) VALUES ($1, $2, $3, $4) ON CONFLICT (command_trigger) DO UPDATE SET reward_type = $2, waifu_id = $3, reward_amount = NULL',
-                [trigger, 'waifu', waifuId, userId]
+                'INSERT INTO custom_commands (command_trigger, reward_type, waifu_id, created_by, expires_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (command_trigger) DO UPDATE SET reward_type = $2, waifu_id = $3, reward_amount = NULL, expires_at = $5',
+                [trigger, 'waifu', waifuId, userId, expiryTime]
             );
-            sendReply(msg.chat.id, msg.message_id, `✅ Reward command /${trigger} created!\n\n🎁 Gives waifu: ${waifuCheck.rows[0].name} (ID: ${waifuId})`);
+            
+            let timeMsg = expiryTime ? `\n⏰ Expires: ${expiryTime.toLocaleString()}` : '';
+            sendReply(msg.chat.id, msg.message_id, `✅ Reward command /${trigger} created!\n\n🎁 Gives waifu: ${waifuCheck.rows[0].name} (ID: ${waifuId})${timeMsg}`);
         } else {
             const amountMatch = rewardText.match(/(\d+)\s*gems?/i);
             if (!amountMatch) {
-                return sendReply(msg.chat.id, msg.message_id, '❌ Invalid format!\n\nUsage: /addreward /trigger Give 100 gems');
+                return sendReply(msg.chat.id, msg.message_id, '❌ Invalid format!\n\nUsage: /addreward /trigger Give 100 gems (1 hour)');
             }
             const amount = parseInt(amountMatch[1]);
             
             await pool.query(
-                'INSERT INTO custom_commands (command_trigger, reward_type, reward_amount, created_by) VALUES ($1, $2, $3, $4) ON CONFLICT (command_trigger) DO UPDATE SET reward_type = $2, reward_amount = $3, waifu_id = NULL',
-                [trigger, 'gems', amount, userId]
+                'INSERT INTO custom_commands (command_trigger, reward_type, reward_amount, created_by, expires_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (command_trigger) DO UPDATE SET reward_type = $2, reward_amount = $3, waifu_id = NULL, expires_at = $5',
+                [trigger, 'gems', amount, userId, expiryTime]
             );
-            sendReply(msg.chat.id, msg.message_id, `✅ Reward command /${trigger} created!\n\n🎁 Gives ${amount} 💎 gems`);
+            
+            let timeMsg = expiryTime ? `\n⏰ Expires: ${expiryTime.toLocaleString()}` : '';
+            sendReply(msg.chat.id, msg.message_id, `✅ Reward command /${trigger} created!\n\n🎁 Gives ${amount} 💎 gems${timeMsg}`);
         }
     } catch (error) {
         console.error('Error adding reward command:', error);
@@ -4381,6 +4423,13 @@ bot.on('message', async (msg) => {
         if (customCmd.rows.length === 0) return;
         
         const c = customCmd.rows[0];
+        
+        // Check if command has expired
+        if (c.expires_at && new Date(c.expires_at) < new Date()) {
+            await pool.query('DELETE FROM custom_commands WHERE command_trigger = $1', [cmd]);
+            return sendReply(msg.chat.id, msg.message_id, '❌ This reward has expired!');
+        }
+        
         const userId = msg.from.id;
         await ensureUser(userId, msg.from.username, msg.from.first_name);
         
