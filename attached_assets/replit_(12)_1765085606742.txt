@@ -1,0 +1,69 @@
+modules = ["nodejs-20", "postgresql-16"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+
+[workflows]
+runButton = "Both Bots Running"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Waifu Bot"
+
+[[workflows.workflow]]
+name = "Waifu Bot"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node bot.js"
+waitForPort = 3000
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Guess Bot"
+author = 50922604
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node guess_bot.js"
+
+[[workflows.workflow]]
+name = "Both Bots"
+author = 50922604
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node bot.js"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node guess_bot.js"
+
+[[workflows.workflow]]
+name = "Both Bots Running"
+author = 50922604
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node bot.js"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node guess_bot.js"
+
+[[ports]]
+localPort = 3000
+externalPort = 3000
