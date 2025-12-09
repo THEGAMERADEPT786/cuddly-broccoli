@@ -4393,20 +4393,32 @@ bot.onText(/\/addreward\s+\/(\w+)\s+[Gg]ive\s+(.+)/i, async (msg, match) => {
         return sendReply(msg.chat.id, msg.message_id, '❌ Cannot override system commands!');
     }
 
-    // Parse time duration (1 second, 10 minutes, 1 hour, 1 day, 1 year)
+    // Parse time duration (10 seconds, 1 minute, 1 hour, 1 day, 1 year)
     const timeMatch = rewardText.match(/\((\d+)\s*(second|seconds|minute|minutes|hour|hours|day|days|year|years)\)/i);
     let expiryTime = null;
+    let timeDisplay = '';
     
     if (timeMatch) {
         const amount = parseInt(timeMatch[1]);
         const unit = timeMatch[2].toLowerCase();
         
         let seconds = 0;
-        if (unit.startsWith('second')) seconds = amount;
-        else if (unit.startsWith('minute')) seconds = amount * 60;
-        else if (unit.startsWith('hour')) seconds = amount * 3600;
-        else if (unit.startsWith('day')) seconds = amount * 86400;
-        else if (unit.startsWith('year')) seconds = amount * 31536000;
+        if (unit.startsWith('second')) {
+            seconds = amount;
+            timeDisplay = `${amount} second${amount > 1 ? 's' : ''}`;
+        } else if (unit.startsWith('minute')) {
+            seconds = amount * 60;
+            timeDisplay = `${amount} minute${amount > 1 ? 's' : ''}`;
+        } else if (unit.startsWith('hour')) {
+            seconds = amount * 3600;
+            timeDisplay = `${amount} hour${amount > 1 ? 's' : ''}`;
+        } else if (unit.startsWith('day')) {
+            seconds = amount * 86400;
+            timeDisplay = `${amount} day${amount > 1 ? 's' : ''}`;
+        } else if (unit.startsWith('year')) {
+            seconds = amount * 31536000;
+            timeDisplay = `${amount} year${amount > 1 ? 's' : ''}`;
+        }
         
         expiryTime = new Date(Date.now() + seconds * 1000);
     }
@@ -4415,7 +4427,7 @@ bot.onText(/\/addreward\s+\/(\w+)\s+[Gg]ive\s+(.+)/i, async (msg, match) => {
         if (rewardText.toLowerCase().includes('waifu id')) {
             const waifuMatch = rewardText.match(/waifu\s*id\s*[-:]?\s*(\d+)/i);
             if (!waifuMatch) {
-                return sendReply(msg.chat.id, msg.message_id, '❌ Invalid format!\n\nUsage: /addreward /trigger Give waifu id - 123 (1 hour)');
+                return sendReply(msg.chat.id, msg.message_id, '❌ Invalid format!\n\nUsage: /addreward /diwali Give waifu id - 123 (1 hour)');
             }
             const waifuId = parseInt(waifuMatch[1]);
             
@@ -4429,12 +4441,12 @@ bot.onText(/\/addreward\s+\/(\w+)\s+[Gg]ive\s+(.+)/i, async (msg, match) => {
                 [trigger, 'waifu', waifuId, userId, expiryTime]
             );
             
-            let timeMsg = expiryTime ? `\n⏰ Expires: ${expiryTime.toLocaleString()}` : '';
+            let timeMsg = expiryTime ? `\n⏰ Expires in: ${timeDisplay}` : '\n⏰ Permanent (no expiry)';
             sendReply(msg.chat.id, msg.message_id, `✅ Reward command /${trigger} created!\n\n🎁 Gives waifu: ${waifuCheck.rows[0].name} (ID: ${waifuId})${timeMsg}`);
         } else {
             const amountMatch = rewardText.match(/(\d+)\s*gems?/i);
             if (!amountMatch) {
-                return sendReply(msg.chat.id, msg.message_id, '❌ Invalid format!\n\nUsage: /addreward /trigger Give 100 gems (1 hour)');
+                return sendReply(msg.chat.id, msg.message_id, '❌ Invalid format!\n\nUsage: /addreward /eid Give 10 gems (1 hour)');
             }
             const amount = parseInt(amountMatch[1]);
             
@@ -4443,7 +4455,7 @@ bot.onText(/\/addreward\s+\/(\w+)\s+[Gg]ive\s+(.+)/i, async (msg, match) => {
                 [trigger, 'gems', amount, userId, expiryTime]
             );
             
-            let timeMsg = expiryTime ? `\n⏰ Expires: ${expiryTime.toLocaleString()}` : '';
+            let timeMsg = expiryTime ? `\n⏰ Expires in: ${timeDisplay}` : '\n⏰ Permanent (no expiry)';
             sendReply(msg.chat.id, msg.message_id, `✅ Reward command /${trigger} created!\n\n🎁 Gives ${amount} 💎 gems${timeMsg}`);
         }
     } catch (error) {
