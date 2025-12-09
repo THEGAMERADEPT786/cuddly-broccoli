@@ -1442,27 +1442,28 @@ bot.on('callback_query', async (query) => {
                 }
             });
         } else {
-            // Count duplicate waifus
+            // GROUP BY ANIME (not rarity)
             const waifuCounts = {};
             result.rows.forEach(w => {
                 waifuCounts[w.waifu_id] = (waifuCounts[w.waifu_id] || 0) + 1;
             });
             
-            let currentRarity = null;
+            let currentAnime = null;
             let index = offset;
             const displayedIds = new Set();
 
             result.rows.forEach((w) => {
                 if (!displayedIds.has(w.waifu_id)) {
-                    if (currentRarity !== w.rarity) {
-                        currentRarity = w.rarity;
-                        message += `\n<b>${RARITY_NAMES[w.rarity]}</b>\n`;
+                    // Group by anime name
+                    if (currentAnime !== w.anime) {
+                        currentAnime = w.anime;
+                        message += `\n<b>${w.anime.toUpperCase()}</b>\n`;
                     }
                     const fav = w.waifu_id === favId ? '⭐' : '';
                     const count = waifuCounts[w.waifu_id];
                     const countDisplay = count > 1 ? ` (×${count})` : '';
                     index++;
-                    message += `${index}. ${fav} ${w.name}${countDisplay} - ${w.anime} (ID: ${w.waifu_id})\n`;
+                    message += `${index}. ${fav} ${w.name}${countDisplay} (ID: ${w.waifu_id})\n`;
                     displayedIds.add(w.waifu_id);
                 }
             });
@@ -2478,47 +2479,49 @@ bot.onText(/\/send/, async (msg) => {
 
     sendReply(msg.chat.id, msg.message_id, `🔄 Broadcasting to ${groups.rows.length} groups and ${users.rows.length} users...\n\n⏳ This may take a few minutes...`);
 
-    // Broadcast to groups with rate limiting
+    // Broadcast to groups with AGGRESSIVE rate limiting
     for (let i = 0; i < groups.rows.length; i++) {
         const group = groups.rows[i];
-        const result = await sendBroadcastMessage(group.group_id, replyMsg, 3);
+        const result = await sendBroadcastMessage(group.group_id, replyMsg, 5); // More retries
         
         if (result.success) {
             successCount++;
+            console.log(`✅ Sent ${i+1}/${groups.rows.length} to group ${group.group_id}`);
         } else if (result.skip) {
             skippedCount++;
         } else {
             failCount++;
-            console.error(`Failed to broadcast to group ${group.group_id}: ${result.reason}`);
+            console.error(`❌ Failed ${i+1}/${groups.rows.length} to group ${group.group_id}: ${result.reason}`);
         }
 
-        // Rate limiting between sends
-        if ((i + 1) % 20 === 0) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+        // SLOWER rate limiting - prevents Telegram blocks
+        if ((i + 1) % 10 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 3000)); // 3s break every 10
         } else {
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 250)); // 250ms between sends
         }
     }
 
-    // Broadcast to user DMs with rate limiting
+    // Broadcast to user DMs with AGGRESSIVE rate limiting
     for (let i = 0; i < users.rows.length; i++) {
         const user = users.rows[i];
-        const result = await sendBroadcastMessage(user.user_id, replyMsg, 3);
+        const result = await sendBroadcastMessage(user.user_id, replyMsg, 5); // More retries
         
         if (result.success) {
             successCount++;
+            console.log(`✅ Sent ${i+1}/${users.rows.length} to user ${user.user_id}`);
         } else if (result.skip) {
             skippedCount++;
         } else {
             failCount++;
-            console.error(`Failed to broadcast to user ${user.user_id}: ${result.reason}`);
+            console.error(`❌ Failed ${i+1}/${users.rows.length} to user ${user.user_id}: ${result.reason}`);
         }
 
-        // Rate limiting between sends (more conservative for DMs)
-        if ((i + 1) % 15 === 0) {
-            await new Promise(resolve => setTimeout(resolve, 1500));
+        // EVEN SLOWER for DMs
+        if ((i + 1) % 8 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 4000)); // 4s break every 8
         } else {
-            await new Promise(resolve => setTimeout(resolve, 150));
+            await new Promise(resolve => setTimeout(resolve, 300)); // 300ms between sends
         }
     }
 
@@ -3497,6 +3500,79 @@ bot.onText(/\/lock\s+(\d+)/, async (msg, match) => {
     sendReply(msg.chat.id, msg.message_id, `✅ ${waifu.rows[0].name} is now ${status}!`);
 });
 
+
+
+// ==================== WELCOME MESSAGE FOR NEW MEMBERS ====================
+bot.on('new_chat_members', async (msg) => {
+    try {
+        const chatId = msg.chat.id;
+        const newMembers = msg.new_chat_members;
+
+        for (const member of newMembers) {
+            if (member.is_bot) continue; // Skip bots
+
+            const userName = member.username ? `@${member.username}` : 'N/A';
+            const firstName = member.first_name || 'Unknown';
+            const userId = member.id;
+
+            const welcomeText = `✨🌸 𝐖𝐄𝐋𝐂𝐎𝐌𝐄 𝐓𝐎 𝐀𝐐𝐔𝐀 𝐑𝐄𝐀𝐋𝐌 🌸✨  
+  
+❤️ 𝗨𝗦𝗘𝗥𝗡𝗔𝗠𝗘: ${userName}  
+💝𝗡𝗔𝗠𝗘: ${firstName}
+💛𝗜𝗗: ${userId}
+  
+𝐖𝐄𝐋𝐂𝐎𝐌𝐄 𝐓𝐎 𝐓𝐇𝐄 𝐌𝐀𝐆𝐈𝐂𝐀𝐋 𝐖𝐎𝐑𝐋𝐃 𝐎𝐅 𝐀𝐐𝐔𝐀 𝐑𝐄𝐀𝐋𝐌 ⚡💫  
+𝐖𝐇𝐄𝐑𝐄 𝐖𝐀𝐈𝐅𝐔𝐒 𝐋𝐈𝐕𝐄, 𝐁𝐀𝐓𝐓𝐋𝐄𝐒 𝐇𝐀𝐏𝐏𝐄𝐍, 𝐀𝐍𝐃 𝐋𝐄𝐆𝐄𝐍𝐃𝐒 𝐀𝐑𝐄 𝐁𝐎𝐑𝐍 🔥❤️  
+  
+🔱 𝐓𝐇𝐈𝐒 𝐈𝐒 𝐀𝐐𝐔𝐀 𝐖𝐀𝐈𝐅𝐔 𝐁𝐎𝐓 🤖💙  
+  
+➤ 𝐄𝐏𝐈𝐂 𝐁𝐀𝐓𝐓𝐋𝐄𝐒 ⚔️  
+➤ 𝐃𝐀𝐈𝐋𝐘 𝐑𝐄𝐖𝐀𝐑𝐃𝐒 💰  
+➤ 𝐑𝐀𝐑𝐄 𝐖𝐀𝐈𝐅𝐔𝐒 💕  
+➤ 𝐅𝐔𝐍, 𝐕𝐈𝐁𝐄𝐒 & 𝐂𝐇𝐀𝐎𝐒 😎🎉  
+  
+🛡️ 𝐇𝐄𝐋𝐏 & 𝐒𝐔𝐏𝐏𝐎𝐑𝐓:  
+
+𝗧𝗛𝗘𝗚𝗔𝗠𝗘𝗥𝗔𝗗𝗘𝗣𝗧🫀🜲ᴀ×ᴡ 𓆩🖤𓆪
+
+𝙉𝙊𝘽𝙄𝙏𝘼🜲ᴀ×ᴡ 𓆩🖤𓆪
+
+𝙻𝚄𝙵𝙵𝚈 🜲ᴀ×ᴡ 𓆩🖤𓆪  
+  
+⚠️ 𝐑𝐔𝐋𝐄𝐒:  
+• 𝐒𝐓𝐀𝐘 𝐑𝐄𝐒𝐏𝐄𝐂𝐓𝐅𝐔𝐋  
+• 𝐍𝐎 𝐒𝐏𝐀𝐌  
+• 𝐄𝐍𝐉𝐎𝐘 𝐓𝐇𝐄 𝐕𝐈𝐁𝐄𝐒 🔥  
+  
+🌸 𝐄𝐍𝐉𝐎𝐘 𝐘𝐎𝐔𝐑 𝐒𝐓𝐀𝐘 𝐈𝐍 𝐀𝐐𝐔𝐀 𝐑𝐄𝐀𝐋𝐌, 𝐖𝐀𝐑𝐑𝐈𝐎𝐑! 🌸`;
+
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: '📢 UPDATES', url: 'https://t.me/AQUAxUPDATES' }],
+                    [{ text: '🤖 START BOT', url: 'https://t.me/Aqua_waifu_bot?start=welcome' }],
+                    [{ text: '👥 JOIN GROUP', url: 'https://t.me/AQUA_REALM' }]
+                ]
+            };
+
+            try {
+                await bot.sendVideo(chatId, 'https://screenapp.io/app/v/sITVky_nYR', {
+                    caption: welcomeText,
+                    parse_mode: 'HTML',
+                    reply_markup: keyboard
+                });
+            } catch (videoError) {
+                // Fallback to text if video fails
+                await bot.sendMessage(chatId, welcomeText, {
+                    parse_mode: 'HTML',
+                    reply_markup: keyboard
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Welcome message error:', error);
+    }
+});
+
 bot.onText(/\/tgm/, async (msg) => {
     const userId = msg.from.id;
 
@@ -4071,31 +4147,34 @@ bot.onText(/\/give_data\s+(.+)/, async (msg, match) => {
 });
 
 
-// ==================== TREASURE COMMAND ====================
+// ==================== TREASURE COMMAND (20k cash required) ====================
 bot.onText(/\/treasure/, async (msg) => {
     if (!await checkUserAccess(msg)) return;
 
     const userId = msg.from.id;
     const chatId = msg.chat.id;
+    const TREASURE_COST = 20000;
 
     try {
-        await ensureUser(userId, msg.from.username, msg.from.first_name);
+        const user = await ensureUser(userId, msg.from.username, msg.from.first_name);
 
-        // Check cooldown (24 hours = 86400 seconds)
-        const cooldown = await checkCooldown(userId, 'treasure', 86400);
-        if (cooldown > 0) {
-            const hours = Math.floor(cooldown / 3600);
-            const mins = Math.floor((cooldown % 3600) / 60);
-            return sendReply(chatId, msg.message_id, `⏰ You can claim treasure again in ${hours}h ${mins}m!`);
+        // Check if user has enough cash
+        if (user.berries < TREASURE_COST) {
+            return sendReply(chatId, msg.message_id, `❌ You need ${TREASURE_COST.toLocaleString()} 💸 ᴄᴀꜱʜ to play treasure hunt!\n\nYou have: ${user.berries.toLocaleString()} 💸`);
         }
+
+        // Deduct cost
+        await pool.query('UPDATE users SET berries = berries - $1 WHERE user_id = $2', [TREASURE_COST, userId]);
+        await saveUserDataToFile(userId);
 
         // Generate random winning position (1-4)
         const winningPosition = Math.floor(Math.random() * 4) + 1;
+        const gems = Math.floor(Math.random() * 3) + 1; // 1-3 gems
 
         // Store winning position for this user
         await pool.query(
-            'INSERT INTO treasure_state (user_id, winning_position, last_claim) VALUES ($1, $2, NOW()) ON CONFLICT (user_id) DO UPDATE SET winning_position = $2, last_claim = NOW()',
-            [userId, winningPosition]
+            'INSERT INTO treasure_state (user_id, winning_position, gems_amount) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET winning_position = $2, gems_amount = $3',
+            [userId, winningPosition, gems]
         );
 
         const keyboard = {
@@ -4109,14 +4188,25 @@ bot.onText(/\/treasure/, async (msg) => {
             ]
         };
 
-        await sendReply(chatId, msg.message_id, '💎 <b>TREASURE HUNT!</b>\n\nChoose a chest to reveal your prize!\nOne chest contains 1-3 gems!', { reply_markup: keyboard });
+        // Treasure hunt start image (excitement)
+        const treasureMsg = `💎✨ <b>TREASURE HUNT!</b> ✨💎\n\nᴏᴍғᴏᴏ ᴛᴇʀɪ ᴋɪsᴍᴀᴛ 😍☠\n\n🎰 Cost: -${TREASURE_COST.toLocaleString()} 💸\n💰 Win up to 3 gems!\n\n🔮 Choose your lucky chest:`;
+
+        await bot.sendPhoto(chatId, 'https://i.imgur.com/treasure_bg.jpg', {
+            caption: treasureMsg,
+            parse_mode: 'HTML',
+            reply_markup: keyboard,
+            reply_to_message_id: msg.message_id
+        }).catch(() => {
+            // Fallback if image fails
+            sendReply(chatId, msg.message_id, treasureMsg, { reply_markup: keyboard });
+        });
     } catch (error) {
         console.error('Error in /treasure command:', error);
         sendReply(chatId, msg.message_id, '❌ Error starting treasure hunt. Please try again!');
     }
 });
 
-// Treasure callback handler
+// Treasure callback handler with win/loss images
 bot.on('callback_query', async (query) => {
     if (!query.data.startsWith('treasure_')) return;
 
@@ -4133,48 +4223,51 @@ bot.on('callback_query', async (query) => {
     }
 
     try {
-        // Get the winning position
-        const state = await pool.query('SELECT winning_position FROM treasure_state WHERE user_id = $1', [treasureUserId]);
+        // Get the winning position and gems
+        const state = await pool.query('SELECT winning_position, gems_amount FROM treasure_state WHERE user_id = $1', [treasureUserId]);
         
         if (state.rows.length === 0) {
             return bot.answerCallbackQuery(query.id, { text: '❌ Treasure hunt expired!', show_alert: true });
         }
 
         const winningPosition = state.rows[0].winning_position;
-        
-        // Generate random gems (1-3)
-        const gems = Math.floor(Math.random() * 3) + 1;
+        const gems = state.rows[0].gems_amount || 1;
 
         let resultText;
+        let resultImage;
+        
         if (chosenPosition === winningPosition) {
-            // Winner! Add gems to user
+            // WINNER! Add gems to user
             await pool.query('UPDATE users SET gems = gems + $1 WHERE user_id = $2', [gems, treasureUserId]);
-            resultText = `🎉 <b>JACKPOT!</b>\n\nYou found the treasure!\n💎 +${gems} gems added to your account!`;
+            await saveUserDataToFile(treasureUserId);
+            
+            resultText = `🎉✨ <b>JACKPOT!</b> ✨🎉\n\nᴏᴍғᴏᴏ ᴛᴇʀɪ ᴋɪsᴍᴀᴛ 😍☠\n\n💎 You won ${gems} gems!\n\n🏆 Chest ${winningPosition} was the winner!`;
+            resultImage = 'https://i.imgur.com/treasure_win.jpg'; // Win background
         } else {
-            resultText = `😢 <b>Empty chest!</b>\n\nThe treasure was in chest ${winningPosition}!\nTry again tomorrow!`;
+            // LOSER! No gems
+            resultText = `😭😢 <b>BAD LUCK!</b> 😢😭\n\nʜᴀᴛ ᴛᴇʀɪ ᴋɪsᴍᴀᴛ ʜɪ ᴋʜᴀʀᴀʙ ʜᴀɪ 🤡🙂\n\n❌ You lost ${gems} gems chance!\n\n💔 The treasure was in chest ${winningPosition}!\n\nᴛʀʏ ᴀɢᴀɪɴ`;
+            resultImage = 'https://i.imgur.com/treasure_lose.jpg'; // Sad crying background
         }
-
-        // Show which chest was the winner
-        const keyboard = {
-            inline_keyboard: [
-                [
-                    { text: winningPosition === 1 ? '💎' : '❌', callback_data: 'noop' },
-                    { text: winningPosition === 2 ? '💎' : '❌', callback_data: 'noop' },
-                    { text: winningPosition === 3 ? '💎' : '❌', callback_data: 'noop' },
-                    { text: winningPosition === 4 ? '💎' : '❌', callback_data: 'noop' }
-                ]
-            ]
-        };
-
-        await bot.editMessageText(resultText, {
-            chat_id: query.message.chat.id,
-            message_id: query.message.message_id,
-            parse_mode: 'HTML',
-            reply_markup: keyboard
-        });
 
         // Clear the treasure state
         await pool.query('DELETE FROM treasure_state WHERE user_id = $1', [treasureUserId]);
+
+        // Try to send image with caption
+        try {
+            await bot.sendPhoto(query.message.chat.id, resultImage, {
+                caption: resultText,
+                parse_mode: 'HTML'
+            });
+            // Delete original message
+            await bot.deleteMessage(query.message.chat.id, query.message.message_id).catch(() => {});
+        } catch (imgError) {
+            // Fallback to text if image fails
+            await bot.editMessageText(resultText, {
+                chat_id: query.message.chat.id,
+                message_id: query.message.message_id,
+                parse_mode: 'HTML'
+            });
+        }
 
         bot.answerCallbackQuery(query.id);
     } catch (error) {
@@ -4283,15 +4376,17 @@ bot.onText(/\/give_waifu(?:\s+(\d+))?/, async (msg, match) => {
 // ==================== REWARD CUSTOM COMMANDS (Owner Only) ====================
 // Format: /addreward /trigger Give <amount> gems (1 hour)
 // or: /addreward /trigger Give waifu id - <waifu_id> (10 seconds)
-bot.onText(/\/addreward\s+\/(\w+)\s+Give\s+(.+)/i, async (msg, match) => {
+bot.onText(/\/addreward\s+\/(\w+)\s+[Gg]ive\s+(.+)/i, async (msg, match) => {
     const userId = msg.from.id;
 
-    if (userId !== OWNER_ID) {
-        return sendReply(msg.chat.id, msg.message_id, '❌ This command is only for the bot owner!');
+    if (userId !== OWNER_ID && !await hasRole(userId, 'dev')) {
+        return sendReply(msg.chat.id, msg.message_id, '❌ This command is only for the bot owner/developer!');
     }
 
     const trigger = match[1].toLowerCase();
     const rewardText = match[2].trim();
+    
+    console.log(`[DEBUG] /addreward: trigger="${trigger}", text="${rewardText}"`);
 
     const systemCommands = ['start', 'help', 'daily', 'weekly', 'bal', 'harem', 'goal', 'treasure', 'addcmd', 'delcmd', 'listcmds', 'addreward', 'delreward', 'convert', 'give_gems', 'give_waifu'];
     if (systemCommands.includes(trigger)) {

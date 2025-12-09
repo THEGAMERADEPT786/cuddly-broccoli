@@ -50,19 +50,28 @@ guessBot.onText(/\/lguess/, async (msg) => {
         return;
     }
 
+    // Convert both to strings and compare (handle negative IDs properly)
+    const currentChat = String(chatId);
+    const officialChat = String(OFFICIAL_GROUP);
+
+    console.log(`[DEBUG] Comparing chats - Current: "${currentChat}", Official: "${officialChat}"`);
+
     // Check if NOT in official group - show join message
-    if (String(chatId) !== String(OFFICIAL_GROUP)) {
+    if (currentChat !== officialChat) {
         const keyboard = {
             inline_keyboard: [
                 [{ text: '𝗝𝗢𝗜𝗡 𝗔𝗤𝗨𝗔 𝗥𝗘𝗔𝗟𝗠 𝗧𝗢 𝗣𝗟𝗔𝗬!', url: OFFICIAL_GROUP_LINK }]
             ]
         };
-        console.log(`[DEBUG] Chat ${chatId} is not official group ${OFFICIAL_GROUP}`);
+        console.log(`[DEBUG] Not official group, showing join message`);
         return guessBot.sendMessage(chatId, 
             '❌ This command only works in AQUA REALM!',
             { reply_markup: keyboard, reply_to_message_id: msg.message_id }
         );
     }
+
+    // OFFICIAL GROUP - Proceed with guess game
+    console.log(`[DEBUG] ✅ Official group confirmed! Starting guess game...`);
 
     try {
         console.log('[DEBUG] Fetching random waifu from database...');
