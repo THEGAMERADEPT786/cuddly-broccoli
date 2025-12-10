@@ -82,6 +82,20 @@ app.get('/health', (req, res) => {
 // CRITICAL: Clear spawn_tracker on bot startup to prevent race conditions
 async function initializeSpawnTracker() {
     try {
+        // Create redeem_codes table if not exists
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS redeem_codes (
+                code TEXT PRIMARY KEY,
+                code_type TEXT NOT NULL,
+                amount BIGINT,
+                waifu_id INT,
+                max_uses INT DEFAULT 1,
+                uses INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+        console.log('✅ Redeem codes table ready');
+        
         await pool.query('DELETE FROM spawn_tracker WHERE message_count >= 100 OR active_spawn_waifu_id IS NOT NULL');
         console.log('✅ Spawn tracker cleared on startup');
     } catch (error) {
@@ -304,6 +318,15 @@ setInterval(checkMonthlyReset, 60 * 60 * 1000);
 checkMonthlyReset();
 
 async function ensureUser(userId, username, firstName) {
+    // Ensure gems column exists
+    await pool.query(`
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='gems') THEN
+                ALTER TABLE users ADD COLUMN gems INT DEFAULT 0;
+            END IF;
+        END $$;
+    `).catch(() => {});
+    
     const result = await pool.query(
         'INSERT INTO users (user_id, username, first_name) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET username = $2, first_name = $3 RETURNING *',
         [userId, username, firstName]
@@ -523,15 +546,47 @@ bot.onText(/\/start/, async (msg) => {
         ]
     };
 
-    const welcomeText = `👋 ʜɪ, ᴍʏ ɴᴀᴍᴇ ɪs 𝗔𝗤𝗨𝗔 𝗪𝗔𝗜𝗙𝗨 𝗕𝗢𝗧, ᴀɴ ᴀɴɪᴍᴇ-ʙᴀsᴇᴅ ɢᴀᴍᴇs ʙᴏᴛ! ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ ᴀɴᴅ ᴛʜᴇ ᴇxᴘᴇʀɪᴇɴᴄᴇ ɢᴇᴛs ᴇxᴘᴀɴᴅᴇᴅ. ʟᴇᴛ's ɪɴɪᴛɪᴀᴛᴇ ᴏᴜʀ ᴊᴏᴜʀɴᴇʏ ᴛᴏɢᴇᴛʜᴇʀ!`;
+    const welcomeText = `👋 ʜɪ, ᴍʏ ɴᴀᴍᴇ ɪs 𝗔𝗤𝗨𝗔 𝗪𝗔𝗜𝗙𝗨 𝗕𝗢𝗧, ᴀɴ ᴀɴɪᴍᴇ-ʙᴀsᴇᴅ ɢᴀᴍᴇs ʙᴏᴛ! ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ ᴀɴᴅ ᴛʜᴇ ᴇxᴘᴇʀɪᴇɴᴄᴇ ɢᴇᴛs ᴇxᴘᴀɴᴅᴇᴅ. ʟᴇᴛ's ɪɴɪᴛɪᴀᴛᴇ ᴏᴜʀ ᴊᴏᴜʀɴᴇʏ ᴛᴏɢᴇᴛʜᴇʀ!
+
+sᴜᴘᴘᴏʀᴛ              ᴏғғɪᴄɪᴀʟ ɢʀᴏᴜᴘ
+
+ᴏᴡɴᴇʀ                 ғᴏᴜɴᴅᴇʀ
+
+
+
+OWNER - 6245574035 & 8195158525
+FOUNDER - 6245574035`;
 
     try {
-        await bot.sendVideo(msg.chat.id, 'https://screenapp.io/app/v/JVe_oriUTy', {
-            caption: welcomeText,
-            reply_to_message_id: msg.message_id,
-            reply_markup: mainMenuKeyboard,
-            parse_mode: 'HTML'
-        });
+        // Get random media from start_media table
+        const mediaResult = await pool.query('SELECT * FROM start_media ORDER BY RANDOM() LIMIT 1');
+        
+        if (mediaResult.rows.length > 0) {
+            const media = mediaResult.rows[0];
+            if (media.media_type === 'video') {
+                await bot.sendVideo(msg.chat.id, media.file_id, {
+                    caption: welcomeText,
+                    reply_to_message_id: msg.message_id,
+                    reply_markup: mainMenuKeyboard,
+                    parse_mode: 'HTML'
+                });
+            } else {
+                await bot.sendPhoto(msg.chat.id, media.file_id, {
+                    caption: welcomeText,
+                    reply_to_message_id: msg.message_id,
+                    reply_markup: mainMenuKeyboard,
+                    parse_mode: 'HTML'
+                });
+            }
+        } else {
+            // Fallback to default video
+            await bot.sendVideo(msg.chat.id, 'https://screenapp.io/app/v/JVe_oriUTy', {
+                caption: welcomeText,
+                reply_to_message_id: msg.message_id,
+                reply_markup: mainMenuKeyboard,
+                parse_mode: 'HTML'
+            });
+        }
     } catch (error) {
         await sendReply(msg.chat.id, msg.message_id, welcomeText, { reply_markup: mainMenuKeyboard });
     }
@@ -1055,6 +1110,42 @@ bot.onText(/\/top/, async (msg) => {
     };
 
     sendReply(msg.chat.id, msg.message_id, '🏆 <b>Leaderboards</b>\n\nChoose a category:', { reply_markup: keyboard });
+});
+
+// /Gtop command - Top 10 richest groups
+bot.onText(/\/gtop/i, async (msg) => {
+    try {
+        const topGroups = await pool.query(`
+            SELECT g.group_id, g.group_name, SUM(u.berries) as total_cash, COUNT(DISTINCT u.user_id) as member_count
+            FROM group_settings g
+            LEFT JOIN users u ON u.user_id IN (
+                SELECT DISTINCT user_id FROM harem WHERE user_id IN (
+                    SELECT user_id FROM users WHERE user_id > 0
+                )
+            )
+            GROUP BY g.group_id, g.group_name
+            ORDER BY total_cash DESC
+            LIMIT 10
+        `);
+
+        let message = '💰 <b>Top 10 Richest Groups</b>\n\n';
+        
+        if (topGroups.rows.length === 0) {
+            message += 'No group data available yet!';
+        } else {
+            topGroups.rows.forEach((group, i) => {
+                const name = group.group_name || `Group ${group.group_id}`;
+                const cash = group.total_cash || 0;
+                const members = group.member_count || 0;
+                message += `${i + 1}. ${name}\n   💸 ${cash.toLocaleString()} | 👥 ${members} members\n\n`;
+            });
+        }
+
+        sendReply(msg.chat.id, msg.message_id, message);
+    } catch (error) {
+        console.error('Error in /gtop:', error);
+        sendReply(msg.chat.id, msg.message_id, '❌ Error loading group leaderboard!');
+    }
 });
 
 bot.onText(/\/uploaderlist/, async (msg) => {
@@ -2429,6 +2520,58 @@ async function sendBroadcastMessage(chatId, replyMsg, maxRetries = 3) {
             const errorMsg = error.message || '';
             
             // Skip "user blocked by bot" or "chat not found" errors - don't retry these
+
+
+// Store for dynamic start media
+const startMediaList = [];
+
+// /uploaddp command - Upload media for /start command
+bot.onText(/\/uploaddp/, async (msg) => {
+    const userId = msg.from.id;
+
+    if (!await hasRole(userId, 'dev') && userId !== OWNER_ID) {
+        return sendReply(msg.chat.id, msg.message_id, '❌ Developer permission required!');
+    }
+
+    if (!msg.reply_to_message || (!msg.reply_to_message.photo && !msg.reply_to_message.video)) {
+        return sendReply(msg.chat.id, msg.message_id, '❌ Reply to a photo or video to add it to /start rotation!');
+    }
+
+    try {
+        let fileId;
+        let mediaType;
+
+        if (msg.reply_to_message.photo) {
+            fileId = msg.reply_to_message.photo[msg.reply_to_message.photo.length - 1].file_id;
+            mediaType = 'photo';
+        } else if (msg.reply_to_message.video) {
+            fileId = msg.reply_to_message.video.file_id;
+            mediaType = 'video';
+        }
+
+        // Store in database
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS start_media (
+                id SERIAL PRIMARY KEY,
+                file_id TEXT NOT NULL,
+                media_type TEXT NOT NULL,
+                uploaded_by BIGINT,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+
+        await pool.query(
+            'INSERT INTO start_media (file_id, media_type, uploaded_by) VALUES ($1, $2, $3)',
+            [fileId, mediaType, userId]
+        );
+
+        sendReply(msg.chat.id, msg.message_id, `✅ ${mediaType === 'photo' ? 'Photo' : 'Video'} added to /start rotation!\n\nFile ID: <code>${fileId}</code>`);
+    } catch (error) {
+        console.error('Error in /uploaddp:', error);
+        sendReply(msg.chat.id, msg.message_id, '❌ Error adding media. Try again!');
+    }
+});
+
             if (errorMsg.includes('blocked by user') || 
                 errorMsg.includes('user is deleted') || 
                 errorMsg.includes('chat not found') ||
