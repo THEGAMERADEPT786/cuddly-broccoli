@@ -3,7 +3,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const { Pool } = require('pg');
 
 const GUESS_BOT_TOKEN = process.env.GUESS_BOT_TOKEN || process.env.GUESS_TOKEN;
-const OFFICIAL_GROUP = '-1002503593313';
+const OFFICIAL_GROUP = '-1002503593313'; // AQUA_REALM official group
 const OFFICIAL_GROUP_LINK = 'https://t.me/AQUA_REALM';
 const GUESS_REWARD = 100;
 
@@ -43,35 +43,34 @@ guessBot.onText(/\/lguess/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    console.log(`[DEBUG] /lguess command received from chat: ${chatId}, official: ${OFFICIAL_GROUP}`);
+    console.log(`[DEBUG] /lguess command from chat: ${chatId} (type: ${msg.chat.type})`);
 
-    // Ignore command in private chats
+    // Ignore private chats completely
     if (msg.chat.type === 'private') {
         return;
     }
 
-    // Convert both to strings and compare (handle negative IDs properly)
-    const currentChat = String(chatId);
-    const officialChat = String(OFFICIAL_GROUP);
+    // Convert to string for comparison
+    const currentChatStr = String(chatId);
+    const officialChatStr = String(OFFICIAL_GROUP);
 
-    console.log(`[DEBUG] Comparing chats - Current: "${currentChat}", Official: "${officialChat}"`);
+    console.log(`[DEBUG] Chat comparison: "${currentChatStr}" === "${officialChatStr}"`);
 
-    // Check if NOT in official group - show join message
-    if (currentChat !== officialChat) {
+    // If NOT official group, show join button
+    if (currentChatStr !== officialChatStr) {
         const keyboard = {
             inline_keyboard: [
                 [{ text: '𝗝𝗢𝗜𝗡 𝗔𝗤𝗨𝗔 𝗥𝗘𝗔𝗟𝗠 𝗧𝗢 𝗣𝗟𝗔𝗬!', url: OFFICIAL_GROUP_LINK }]
             ]
         };
-        console.log(`[DEBUG] Not official group, showing join message`);
         return guessBot.sendMessage(chatId, 
             '❌ This command only works in AQUA REALM!',
             { reply_markup: keyboard, reply_to_message_id: msg.message_id }
-        );
+        ).catch(err => console.error('[ERROR] Failed to send join message:', err));
     }
 
-    // OFFICIAL GROUP - Proceed with guess game
-    console.log(`[DEBUG] ✅ Official group confirmed! Starting guess game...`);
+    // ✅ OFFICIAL GROUP - Start guess game
+    console.log(`[DEBUG] ✅ Official group confirmed! Starting game...`);
 
     try {
         console.log('[DEBUG] Fetching random waifu from database...');

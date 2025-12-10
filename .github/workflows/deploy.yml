@@ -1,0 +1,41 @@
+
+name: Deploy Telegram Bots
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+    
+    - name: Setup Node.js 20
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    
+    - name: Install Dependencies
+      run: npm install
+    
+    - name: Start Bot
+      env:
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        BOT_TOKEN_1: ${{ secrets.BOT_TOKEN }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        GUESS_BOT_TOKEN: ${{ secrets.GUESS_BOT_TOKEN }}
+        GUESS_TOKEN: ${{ secrets.GUESS_BOT_TOKEN }}
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        OWNER_ID: ${{ secrets.OWNER_ID }}
+        DEVELOPER_ID: ${{ secrets.OWNER_ID }}
+        CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+        DATABASE_CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+        UPLOAD_GROUP_ID: ${{ secrets.UPLOAD_GROUP_ID }}
+      run: |
+        node bot.js &
+        sleep 5
+        node guess_bot.js
