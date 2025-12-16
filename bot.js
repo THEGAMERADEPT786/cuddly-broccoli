@@ -6,6 +6,18 @@ const fs = require('fs').promises;
 const path = require('path');
 const { saveAllData, saveBotData, saveWaifusData, saveUsersData } = require('./auto_save_data.js');
 
+// Import and start guess bot
+try {
+    const { guessBot } = require('./guess_bot.js');
+    if (guessBot) {
+        console.log('✅ Guess bot loaded successfully');
+    } else {
+        console.log('⚠️ Guess bot not loaded (missing token)');
+    }
+} catch (error) {
+    console.error('❌ Error loading guess bot:', error.message);
+}
+
 // Try multiple token sources for compatibility
 const token = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN || process.env.BOT_TOKEN_1;
 const channelId = process.env.CHANNEL_ID || process.env.DATABASE_CHANNEL_ID;
@@ -4965,9 +4977,13 @@ bot.onText(/\/listrewards/, async (msg) => {
 // Handle reward custom commands
 bot.on('message', async (msg) => {
     if (!msg.text || !msg.text.startsWith('/')) return;
-    
+
     const cmd = msg.text.split(/\s+/)[0].substring(1).toLowerCase().split('@')[0];
-    
+
+    // Skip system commands to avoid conflicts
+    const systemCommands = ['start', 'help', 'daily', 'weekly', 'bal', 'balance', 'harem', 'goal', 'treasure', 'explore', 'claim', 'marry', 'dart', 'top', 'gtop', 'uploaderlist', 'sudolist', 'pay', 'dinfo', 'cmode', 'adev', 'rdev', 'reset_waifu', 'reset_cash', 'gban', 'addcmd', 'delcmd', 'listcmds', 'lguess'];
+    if (systemCommands.includes(cmd)) return;
+
     try {
         const customCmd = await pool.query('SELECT * FROM custom_commands WHERE command_trigger = $1', [cmd]);
         if (customCmd.rows.length === 0) return;
@@ -5102,9 +5118,13 @@ bot.onText(/\/listcmds/, async (msg) => {
 // Handle dynamic commands
 bot.on('message', async (msg) => {
     if (!msg.text || !msg.text.startsWith('/')) return;
-    
+
     const command = msg.text.split(/\s+/)[0].substring(1).toLowerCase().split('@')[0];
-    
+
+    // Skip system commands to avoid conflicts
+    const systemCommands = ['start', 'help', 'daily', 'weekly', 'bal', 'balance', 'harem', 'goal', 'treasure', 'explore', 'claim', 'marry', 'dart', 'top', 'gtop', 'uploaderlist', 'sudolist', 'pay', 'dinfo', 'cmode', 'adev', 'rdev', 'reset_waifu', 'reset_cash', 'gban', 'addcmd', 'delcmd', 'listcmds', 'lguess'];
+    if (systemCommands.includes(command)) return;
+
     try {
         const result = await pool.query('SELECT command_response FROM dynamic_commands WHERE command_name = $1', [command]);
         

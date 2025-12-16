@@ -11,9 +11,9 @@ async function restoreFromJSON() {
         console.log('🔄 Starting data restoration...\n');
 
         // Use the most recent uploaded data files
-        const usersFile = './attached_assets/users_data_1765083826714.json';
-        const waifusFile = './attached_assets/waifus_data_1765083826818.json';
-        const botFile = './attached_assets/bot_data_1765083826844.json';
+        const usersFile = './attached_assets/users_data_1765087644875.json';
+        const waifusFile = './attached_assets/waifus_data_1765087644903.json';
+        const botFile = './attached_assets/bot_data_1765087644936.json';
 
         // Check if files exist
         try {
