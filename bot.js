@@ -62,14 +62,19 @@ app.post('/webhook', express.json(), (req, res) => {
     }
 });
 
-// Set webhook on startup
-async function setupWebhook() {
+// Set webhook on startup with retry logic
+async function setupWebhook(retryCount = 0) {
+    const maxRetries = 3;
+
     if (process.env.WEBHOOK_URL) {
         try {
             const webhookUrl = process.env.WEBHOOK_URL + '/webhook';
-            console.log(`🔄 Setting webhook to: ${webhookUrl}`);
+            console.log(`🔄 Setting webhook to: ${webhookUrl} (attempt ${retryCount + 1}/${maxRetries + 1})`);
 
-            const result = await bot.setWebHook(webhookUrl);
+            const result = await bot.setWebHook(webhookUrl, {
+                max_connections: 100,
+                allowed_updates: ["message", "callback_query", "inline_query"]
+            });
             console.log('✅ Webhook setup result:', result);
 
             // Verify webhook is set
@@ -78,20 +83,49 @@ async function setupWebhook() {
 
             if (webhookInfo.url === webhookUrl) {
                 console.log('🎉 Webhook successfully configured!');
+                return true;
             } else {
                 console.error('⚠️ Webhook URL mismatch:', webhookInfo.url, 'vs expected:', webhookUrl);
+                throw new Error('Webhook URL mismatch');
             }
         } catch (error) {
-            console.error('❌ Failed to set webhook:', error.message);
-            console.error('🔄 Falling back to polling mode...');
+            console.error('❌ Webhook setup failed:', error.message);
 
-            // Fallback to polling if webhook fails
-            bot.startPolling();
-            console.log('✅ Polling started as fallback');
+            if (retryCount < maxRetries) {
+                console.log(`🔄 Retrying webhook setup in ${5 * (retryCount + 1)} seconds...`);
+                setTimeout(() => setupWebhook(retryCount + 1), 5000 * (retryCount + 1));
+                return false;
+            } else {
+                console.error('❌ Max retries reached, falling back to polling...');
+                try {
+                    bot.startPolling({
+                        polling: {
+                            interval: 300,
+                            autoStart: true,
+                            params: {
+                                timeout: 10
+                            }
+                        }
+                    });
+                    console.log('✅ Polling started as fallback');
+                } catch (pollError) {
+                    console.error('❌ Polling fallback also failed:', pollError.message);
+                }
+                return false;
+            }
         }
     } else {
-        console.error('❌ WEBHOOK_URL not set, starting polling...');
-        bot.startPolling();
+        console.log('⚠️ No WEBHOOK_URL provided, using polling mode');
+        bot.startPolling({
+            polling: {
+                interval: 300,
+                autoStart: true,
+                params: {
+                    timeout: 10
+                }
+            }
+        });
+        return true;
     }
 }
 
@@ -390,10 +424,19 @@ bot.on('polling_error', (error) => {
 
 bot.on('webhook_error', (error) => {
     console.error('❌ Webhook error:', error);
+    console.log('🔄 Attempting to reconfigure webhook...');
+
+    // Wait a bit then try to reconfigure webhook
+    setTimeout(() => {
+        setupWebhook(0);
+    }, 5000);
 });
 
 bot.on('error', (error) => {
     console.error('❌ Bot error:', error);
+    if (error.code === 'ETELEGRAM') {
+        console.log('🔄 Telegram API error detected, checking connection...');
+    }
 });
 
 // Log incoming messages for debugging
