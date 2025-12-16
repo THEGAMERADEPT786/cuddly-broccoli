@@ -10,17 +10,17 @@ services:
         value: production
       - key: USE_WEBHOOK
         value: true
-      - key: WEBHOOK_URL
+      - key: https://api.render.com/deploy/srv-d50bqu0gjchc73c96s90?key=nNdyau8wJ4M
         fromSecret: WEBHOOK_URL
-      - key: TELEGRAM_BOT_TOKEN
+      - key: 8365459336:AAG2pS3tJUtO0vGr0iFHu0EtY7NNsUhAjLg
         fromSecret: TELEGRAM_BOT_TOKEN
-      - key: DATABASE_URL
+      - key: 5STHB70V+GylGmniaJjnol76Uqp97XS+dXQfYC8RFPNewMN9wH8en3qYwVB6qkCE4lo5PJRalLYuEeUVeUNHpw==
         fromSecret: DATABASE_URL
-      - key: OWNER_ID
+      - key: 6245574035
         fromSecret: OWNER_ID
       - key: CHANNEL_ID
-        fromSecret: CHANNEL_ID
-      - key: UPLOAD_GROUP_ID
+        fromSecret: -1003394774430
+      - key: 3370436684
         fromSecret: UPLOAD_GROUP_ID
-      - key: GUESS_BOT_TOKEN
+      - key: 8307986913:AAFvFjx92FgeKDj-QUVM3W5qi9f8LdDlpFA
         fromSecret: GUESS_BOT_TOKEN
