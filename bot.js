@@ -22,19 +22,66 @@ if (!token) {
     process.exit(1);
 }
 
-const bot = new TelegramBot(token, { 
-    polling: {
-        interval: 3000,      // Check every 3 seconds (instead of 300ms)
-        autoStart: true,
-        params: { 
-            timeout: 60      // Longer timeout to avoid crashes
-        }
-    }
+const bot = new TelegramBot(token, {
+    polling: false  // Never use polling on Render - always use webhooks
 });
+
+if (!process.env.DATABASE_URL) {
+    console.error('Error: DATABASE_URL not found in environment variables');
+    console.error('Please add DATABASE_URL in your deployment environment');
+    process.exit(1);
+}
+
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Webhook endpoint for Render deployment
+app.post('/webhook', express.json(), (req, res) => {
+    try {
+        console.log('📨 Webhook received:', req.body);
+        bot.processUpdate(req.body);
+        res.sendStatus(200);
+        console.log('✅ Webhook processed successfully');
+    } catch (error) {
+        console.error('❌ Webhook processing error:', error);
+        res.sendStatus(500);
+    }
+});
+
+// Set webhook on startup
+async function setupWebhook() {
+    if (process.env.WEBHOOK_URL) {
+        try {
+            const webhookUrl = process.env.WEBHOOK_URL + '/webhook';
+            console.log(`🔄 Setting webhook to: ${webhookUrl}`);
+
+            const result = await bot.setWebHook(webhookUrl);
+            console.log('✅ Webhook setup result:', result);
+
+            // Verify webhook is set
+            const webhookInfo = await bot.getWebHookInfo();
+            console.log('📋 Webhook info:', webhookInfo);
+
+            if (webhookInfo.url === webhookUrl) {
+                console.log('🎉 Webhook successfully configured!');
+            } else {
+                console.error('⚠️ Webhook URL mismatch:', webhookInfo.url, 'vs expected:', webhookUrl);
+            }
+        } catch (error) {
+            console.error('❌ Failed to set webhook:', error.message);
+            console.error('🔄 Falling back to polling mode...');
+
+            // Fallback to polling if webhook fails
+            bot.startPolling();
+            console.log('✅ Polling started as fallback');
+        }
+    } else {
+        console.error('❌ WEBHOOK_URL not set, starting polling...');
+        bot.startPolling();
+    }
+}
 
 app.get('/', (req, res) => {
     res.send(`
@@ -70,14 +117,206 @@ app.get('/', (req, res) => {
     `);
 });
 
-app.get('/health', (req, res) => {
-    res.setHeader('Cache-Control', 'no-cache');
-    res.json({ 
-        status: 'online', 
-        uptime: process.uptime(),
-        timestamp: new Date().toISOString()
-    });
+app.get('/health', async (req, res) => {
+    try {
+        res.setHeader('Cache-Control', 'no-cache');
+
+        // Check database connection
+        await pool.query('SELECT 1');
+
+        // Get webhook info
+        let webhookInfo = null;
+        try {
+            webhookInfo = await bot.getWebHookInfo();
+        } catch (e) {
+            console.error('Webhook info error:', e.message);
+        }
+
+        res.json({
+            status: 'online',
+            uptime: process.uptime(),
+            timestamp: new Date().toISOString(),
+            database: 'connected',
+            webhook: {
+                url: webhookInfo?.url || null,
+                pending_updates: webhookInfo?.pending_update_count || 0
+            },
+            environment: {
+                node_env: process.env.NODE_ENV,
+                use_webhook: process.env.USE_WEBHOOK,
+                webhook_url: process.env.WEBHOOK_URL ? 'set' : 'not set',
+                bot_token: process.env.TELEGRAM_BOT_TOKEN ? 'set' : 'not set'
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
+
+// CRITICAL: Initialize all database tables on startup
+async function initializeDatabase() {
+    try {
+        console.log('🔄 Initializing database tables...');
+        
+        // Users table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                user_id BIGINT PRIMARY KEY,
+                username VARCHAR(255),
+                first_name VARCHAR(255),
+                berries INTEGER DEFAULT 50000,
+                gems INTEGER DEFAULT 0,
+                daily_streak INTEGER DEFAULT 0,
+                weekly_streak INTEGER DEFAULT 0,
+                last_daily_claim TIMESTAMP,
+                last_weekly_claim TIMESTAMP,
+                last_claim_date DATE,
+                favorite_waifu_id INTEGER,
+                harem_filter_rarity INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ Users table ready');
+
+        // Waifus table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS waifus (
+                waifu_id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                anime VARCHAR(255) NOT NULL,
+                rarity INTEGER NOT NULL CHECK (rarity >= 1 AND rarity <= 16),
+                image_file_id TEXT,
+                price INTEGER DEFAULT 5000,
+                is_locked BOOLEAN DEFAULT FALSE,
+                uploaded_by BIGINT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ Waifus table ready');
+
+        // Harem table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS harem (
+                id SERIAL PRIMARY KEY,
+                user_id BIGINT REFERENCES users(user_id),
+                waifu_id INTEGER REFERENCES waifus(waifu_id),
+                acquired_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                owned_since TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ Harem table ready');
+
+        // Roles table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS roles (
+                id SERIAL PRIMARY KEY,
+                user_id BIGINT REFERENCES users(user_id),
+                role_type VARCHAR(50) NOT NULL,
+                UNIQUE (user_id, role_type)
+            )
+        `);
+        console.log('✅ Roles table ready');
+
+        // Group settings table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS group_settings (
+                group_id BIGINT PRIMARY KEY,
+                spawn_enabled BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ Group settings table ready');
+
+        // Spawn tracker table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS spawn_tracker (
+                group_id BIGINT PRIMARY KEY,
+                message_count INTEGER DEFAULT 0,
+                active_spawn_waifu_id INTEGER,
+                active_spawn_name VARCHAR(255),
+                bid_message_count INTEGER DEFAULT 0,
+                last_spawn TIMESTAMP
+            )
+        `);
+        console.log('✅ Spawn tracker table ready');
+
+        // Group bids table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS group_bids (
+                id SERIAL PRIMARY KEY,
+                group_id BIGINT,
+                waifu_id INTEGER REFERENCES waifus(waifu_id),
+                current_bid INTEGER DEFAULT 0,
+                current_bidder_id BIGINT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ Group bids table ready');
+
+        // Bazaar items table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS bazaar_items (
+                item_id SERIAL PRIMARY KEY,
+                waifu_id INTEGER REFERENCES waifus(waifu_id),
+                seller_id BIGINT REFERENCES users(user_id),
+                price INTEGER NOT NULL,
+                status VARCHAR(20) DEFAULT 'active',
+                listed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ Bazaar items table ready');
+
+        // Cooldowns table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS cooldowns (
+                id SERIAL PRIMARY KEY,
+                user_id BIGINT,
+                command VARCHAR(50),
+                last_used TIMESTAMP,
+                UNIQUE (user_id, command)
+            )
+        `);
+        console.log('✅ Cooldowns table ready');
+
+        // Spam blocks table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS spam_blocks (
+                user_id BIGINT PRIMARY KEY,
+                blocked_until TIMESTAMP
+            )
+        `);
+        console.log('✅ Spam blocks table ready');
+
+        // Banned users table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS banned_users (
+                user_id BIGINT PRIMARY KEY,
+                banned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                reason TEXT
+            )
+        `);
+        console.log('✅ Banned users table ready');
+
+        // Bot settings table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS bot_settings (
+                key VARCHAR(100) PRIMARY KEY,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('✅ Bot settings table ready');
+
+        console.log('✅ All database tables initialized successfully!');
+    } catch (error) {
+        console.error('❌ Database initialization error:', error);
+        // Don't exit - continue with partial initialization
+    }
+}
 
 // CRITICAL: Clear spawn_tracker on bot startup to prevent race conditions
 async function initializeSpawnTracker() {
@@ -104,11 +343,22 @@ async function initializeSpawnTracker() {
 }
 
 // Run initialization before server starts
-initializeSpawnTracker();
+initializeDatabase().then(() => {
+    return initializeSpawnTracker();
+}).then(() => {
+    console.log('✅ Database initialization complete');
+    // Setup webhook after database is ready
+    return setupWebhook();
+}).then(() => {
+    console.log('✅ Webhook setup complete');
+}).catch((error) => {
+    console.error('❌ Initialization error:', error);
+});
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 Web server running on port ${PORT}`);
     console.log(`✅ Bot is ready for deployment`);
+    console.log(`🔗 Webhook endpoint: /webhook`);
 }).on('error', (err) => {
     console.error('Server error:', err);
     if (err.code === 'EADDRINUSE') {
@@ -120,15 +370,23 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 bot.on('polling_error', (error) => {
-    console.error('Polling error:', error);
+    console.error('❌ Polling error:', error);
     if (error.code === 'ETELEGRAM') {
-        console.error('Telegram API error - bot will attempt to reconnect');
+        console.error('🔄 Telegram API error - bot will attempt to reconnect');
     }
 });
 
-bot.on('error', (error) => {
-    console.error('Bot error:', error);
+bot.on('webhook_error', (error) => {
+    console.error('❌ Webhook error:', error);
 });
+
+bot.on('error', (error) => {
+    console.error('❌ Bot error:', error);
+});
+
+// Log incoming messages for debugging
+bot.on('message', (msg) => {
+    console.log(`📨 Message from ${msg.from.first_name} (${msg.from.id}): ${msg.text}`);
 
 // ⚠️ CRITICAL ERROR HANDLERS - NEVER EXIT
 process.on('unhandledRejection', (reason, promise) => {
@@ -743,7 +1001,7 @@ bot.on('callback_query', async (query) => {
                     [{ text: '« BACK', callback_data: 'menu_help' }]
                 ]
             };
-            const helpText = `<b>𝗕𝗔𝗦𝗜𝗖 𝗖𝗢𝗠𝗠𝗔𝗡𝗗𝗦 𝟭/𝟮</b>\n\n<b>/Start</b> - 𝗦𝗧𝗔𝗥𝗧 𝗧𝗛𝗘 𝗕𝗢𝗧\n\n<b>/Grab</b> - 𝗚𝗥𝗔𝗕 𝗧𝗛𝗘 𝗖𝗛𝗔𝗥𝗔𝗖𝗧𝗘𝗥\n\n<b>/Fav</b> - 𝗔𝗗𝗗 𝗔 𝗖𝗛𝗔𝗥𝗔𝗖𝗧𝗘𝗥 𝗧𝗢 𝗬𝗢𝗨𝗥 𝗙𝗔𝗩\n\n<b>/Dwaifu</b> - 𝗖𝗟𝗔𝗜𝗠 𝗬𝗢𝗨𝗥 𝗗𝗔𝗜𝗟𝗬 𝗪𝗔𝗜𝗙𝗨\n\n<b>/Pay</b> - 𝗚𝗜𝗩𝗘 ɢᴇᴍs 💠 𝗧𝗢 𝗢𝗧𝗛𝗘𝗥 𝗨𝗦𝗘𝗥𝗦\n\n<b>/Bal</b> - 𝗦𝗘𝗘 𝗬𝗢𝗨𝗥 𝗕𝗔𝗟𝗔𝗡𝗖𝗘`;
+            const helpText = `<b>𝗕𝗔𝗦𝗜𝗖 𝗖𝗢𝗠𝗠𝗔𝗡𝗗𝗦 𝟭/𝟮</b>\n\n<b>/Start</b> - 𝗦𝗧𝗔𝗥𝗧 𝗧𝗛𝗘 𝗕𝗢𝗧\n\n<b>/Grab</b> - 𝗚𝗥𝗔𝗕 𝗧𝗛𝗘 𝗖𝗛𝗔𝗥𝗔𝗖𝗧𝗘𝗥\n\n<b>/Fav</b> - 𝗔𝗗𝗗 𝗔 𝗖𝗛𝗔𝗥𝗔𝗖𝗧𝗘𝗥 𝗧𝗢 𝗬𝗢𝗨𝗥 𝗙𝗔𝗩\n\n<b>/Dwaifu</b> - 𝗖𝗟𝗔𝗜𝗠 𝗬𝗢𝗨𝗥 𝗗𝗔𝗜𝗟𝗬 𝗪𝗔𝗜𝗙𝗨\n\n<b>/Pay</b> - 𝗚𝗜𝗩𝗘 ᴄᴀꜱʜ 💸 𝗧𝗢 𝗢𝗧𝗛𝗘𝗥 𝗨𝗦𝗘𝗥𝗦\n\n<b>/Bal</b> - 𝗦𝗘𝗘 𝗬𝗢𝗨𝗥 𝗕𝗔𝗟𝗔𝗡𝗖𝗘`;
             await bot.editMessageText(helpText, {
                 chat_id: chatId,
                 message_id: messageId,
@@ -4361,7 +4619,7 @@ bot.onText(/\/treasure/, async (msg) => {
         };
 
         // Treasure hunt start image (excitement)
-        const treasureMsg = `💎✨ <b>TREASURE HUNT!</b> ✨💎\n\nᴏᴍғᴏᴏ ᴛᴇʀɪ ᴋɪsᴍᴀᴛ 😍☠\n\n🎰 Cost: -${TREASURE_COST.toLocaleString()} 💸\n💰 Win up to 3 gems!\n\n🔮 Choose your lucky chest:`;
+        const treasureMsg = `💎✨ <b>TREASURE HUNT!</b> ✨💎\n\nOh wow, what a fate! 😍☠\n\n🎰 Cost: -${TREASURE_COST.toLocaleString()} 💸\n💰 Win up to 3 gems!\n\n🔮 Choose your lucky chest:`;
 
         await bot.sendPhoto(chatId, 'https://i.imgur.com/treasure_bg.jpg', {
             caption: treasureMsg,
@@ -4413,11 +4671,11 @@ bot.on('callback_query', async (query) => {
             await pool.query('UPDATE users SET gems = gems + $1 WHERE user_id = $2', [gems, treasureUserId]);
             await saveUserDataToFile(treasureUserId);
             
-            resultText = `🎉✨ <b>JACKPOT!</b> ✨🎉\n\nᴏᴍғᴏᴏ ᴛᴇʀɪ ᴋɪsᴍᴀᴛ 😍☠\n\n💎 You won ${gems} gems!\n\n🏆 Chest ${winningPosition} was the winner!`;
+            resultText = `🎉✨ <b>JACKPOT!</b> ✨🎉\n\nOh wow, what a fate! 😍☠\n\n💎 You won ${gems} gems!\n\n🏆 Chest ${winningPosition} was the winner!`;
             resultImage = 'https://i.imgur.com/treasure_win.jpg'; // Win background
         } else {
             // LOSER! No gems
-            resultText = `😭😢 <b>BAD LUCK!</b> 😢😭\n\nʜᴀᴛ ᴛᴇʀɪ ᴋɪsᴍᴀᴛ ʜɪ ᴋʜᴀʀᴀʙ ʜᴀɪ 🤡🙂\n\n❌ You lost ${gems} gems chance!\n\n💔 The treasure was in chest ${winningPosition}!\n\nᴛʀʏ ᴀɢᴀɪɴ`;
+            resultText = `😭😢 <b>BAD LUCK!</b> 😢😭\n\nYour fate is bad today! 🤡🙂\n\n❌ You lost your gems chance!\n\n💔 The treasure was in chest ${winningPosition}!\n\nTry again`;
             resultImage = 'https://i.imgur.com/treasure_lose.jpg'; // Sad crying background
         }
 
