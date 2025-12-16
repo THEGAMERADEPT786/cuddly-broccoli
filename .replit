@@ -40,18 +40,15 @@ mode = "sequential"
 task = "shell.exec"
 args = "node guess_bot.js"
 
+[[workflows.workflow]]
+name = "Developer bot"
+mode = "sequential"
+author = 50927882
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Project"
+
 [[ports]]
 localPort = 3000
-externalPort = 3000
-
-[[ports]]
-localPort = 35535
-externalPort = 3002
-
-[[ports]]
-localPort = 37787
 externalPort = 80
-
-[[ports]]
-localPort = 40445
-externalPort = 3001

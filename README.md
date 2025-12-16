@@ -97,7 +97,47 @@ worker: node guess_bot.js
 
 ---
 
-## ☁️ **4. Vercel Deployment** (Webhook Mode Only)
+## 🌐 **5. Render Deployment**
+
+### **Setup Steps:**
+
+1. **Create a Render account** at [render.com](https://render.com)
+
+2. **Connect your GitHub repository:**
+   - Click "New" → "Web Service"
+   - Connect your GitHub account
+   - Select the waifu-bot repository
+
+3. **Configure the service:**
+   - **Name:** waifu-bot
+   - **Environment:** Node
+   - **Build Command:** `npm install`
+   - **Start Command:** `npm start`
+
+4. **Add Environment Variables:**
+   - `NODE_ENV` = `production`
+   - `USE_WEBHOOK` = `true`
+   - `WEBHOOK_URL` = `https://your-app-name.onrender.com` (replace with your Render app URL)
+   - `TELEGRAM_BOT_TOKEN` = Your bot token
+   - `DATABASE_URL` = Your PostgreSQL database URL
+   - `OWNER_ID` = Your Telegram user ID
+   - `CHANNEL_ID` = Database backup channel ID
+   - `UPLOAD_GROUP_ID` = Upload notification group ID
+   - `GUESS_BOT_TOKEN` = Guess bot token (optional)
+
+5. **Deploy:**
+   - Click "Create Web Service"
+   - Render will build and deploy automatically
+
+6. **Set Telegram Webhook:**
+   After deployment, run this command to set the webhook:
+   ```bash
+   curl -X POST https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=https://your-app-name.onrender.com/webhook
+   ```
+
+---
+
+## ☁️ **6. Vercel Deployment** (Webhook Mode Only)
 
 **⚠️ Note:** Vercel doesn't support long-polling bots. Use webhooks instead.
 
