@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: waifu-bot
+    env: node
+    rootDir: .
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: USE_WEBHOOK
+        value: true
+      - key: WEBHOOK_URL
+        fromSecret: WEBHOOK_URL
+      - key: TELEGRAM_BOT_TOKEN
+        fromSecret: TELEGRAM_BOT_TOKEN
+      - key: DATABASE_URL
+        fromSecret: DATABASE_URL
+      - key: OWNER_ID
+        fromSecret: OWNER_ID
+      - key: CHANNEL_ID
+        fromSecret: CHANNEL_ID
+      - key: UPLOAD_GROUP_ID
+        fromSecret: UPLOAD_GROUP_ID
+      - key: GUESS_BOT_TOKEN
+        fromSecret: GUESS_BOT_TOKEN
