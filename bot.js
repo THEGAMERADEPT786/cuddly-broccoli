@@ -5119,3 +5119,4 @@ bot.on('message', async (msg) => {
 console.log('✅ Waifu Collection Bot started successfully!');
 console.log(`Owner ID: ${OWNER_ID}`);
 console.log('Waiting for messages...');
+});
