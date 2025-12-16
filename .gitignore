@@ -31,3 +31,6 @@ build/
 
 # Package lock (optional)
 package-lock.json
+
+# Commands file (contains secrets)
+commands.json
